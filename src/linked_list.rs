@@ -18,6 +18,7 @@ impl<T> Node<T> {
   }
 }
 
+#[derive(Default)]
 pub struct LinkedList<T> {
   head: Link<T>,
   tail: Link<T>,
@@ -156,6 +157,14 @@ impl<T> LinkedList<T> {
       cur_node = unsafe { (*cur_node.unwrap().as_ptr()).next };
     }
     cur_node
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.size == 0
+  }
+
+  pub fn size(&self) -> usize {
+    self.size
   }
 }
 
