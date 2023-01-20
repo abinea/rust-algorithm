@@ -1,4 +1,4 @@
-struct UnionSet {
+pub struct UnionSet {
   parent: Vec<usize>,
   size: Vec<usize>,
   count: usize,
