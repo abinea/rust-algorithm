@@ -1,0 +1,10 @@
+language: rust
+
+before_script:
+  - rustup component add rustfmt-preview # 预置rustfmt
+  - rustup component add clippy # 预置clippy
+
+script:
+  - cargo fmt --all -- --check # 格式化检查
+  - cargo clippy --all -- -D warnings # 质量检查
+  - cargo test # 测试用例
