@@ -1,5 +1,6 @@
 use std::{
   cmp::{max, Ordering},
+  fmt::Debug,
   mem,
   ops::Not,
 };
@@ -38,7 +39,7 @@ impl<T: Ord> AVLNode<T> {
       2 => Side::Right,
       _ => return,
     };
-    let subtree = self.child(side).as_mut().unwrap();
+    let subtree = self.child_mut(side).as_mut().unwrap();
     if let (Side::Left, 1) | (Side::Right, -1) = (side, subtree.balance_factor()) {
       subtree.rotate(side);
     }
@@ -46,20 +47,31 @@ impl<T: Ord> AVLNode<T> {
   }
   // 更新节点高度
   fn update_height(&mut self) {
-    self.height = 1 + max(height(&self.left), height(&self.right))
+    self.height = 1 + max(self.height(Side::Left), self.height(Side::Right))
+  }
+  // 高度计算
+  fn height(&self, side: Side) -> usize {
+    self.child(side).as_ref().map_or(0, |n| n.height)
   }
   // 平衡因子计算
   fn balance_factor(&self) -> i8 {
-    let left = height(&self.left);
-    let right = height(&self.right);
+    let left = self.height(Side::Left);
+    let right = self.height(Side::Right);
     if left < right {
       (right - left) as i8
     } else {
       -((left - right) as i8)
     }
   }
+  // 获取子树不可变引用
+  fn child(&self, side: Side) -> &Option<Box<AVLNode<T>>> {
+    match side {
+      Side::Left => &self.left,
+      Side::Right => &self.right,
+    }
+  }
   // 获取子树可变引用
-  fn child(&mut self, side: Side) -> &mut Option<Box<AVLNode<T>>> {
+  fn child_mut(&mut self, side: Side) -> &mut Option<Box<AVLNode<T>>> {
     match side {
       Side::Left => &mut self.left,
       Side::Right => &mut self.right,
@@ -67,19 +79,12 @@ impl<T: Ord> AVLNode<T> {
   }
   // 旋转操作
   fn rotate(&mut self, side: Side) {
-    let mut subtree = self.child(!side).take().unwrap();
-    *self.child(!side) = subtree.child(side).take();
+    let mut subtree = self.child_mut(!side).take().unwrap();
+    *self.child_mut(!side) = subtree.child_mut(side).take();
     self.update_height();
     mem::swap(self, &mut subtree);
-    *self.child(side) = Some(subtree);
+    *self.child_mut(side) = Some(subtree);
     self.update_height();
-  }
-}
-// 高度计算
-fn height<T: Ord>(x: &Option<Box<AVLNode<T>>>) -> usize {
-  match x {
-    None => 0,
-    Some(node) => node.height,
   }
 }
 
@@ -111,6 +116,27 @@ impl<T: Ord> AVLTree<T> {
       self.length -= 1
     }
     removed
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.length == 0
+  }
+
+  pub fn size(&self) -> usize {
+    self.length
+  }
+
+  pub fn iter(&self) -> Iter<T> {
+    let cap = self.root.as_ref().map_or(0, |n| n.height);
+    let mut node_stack = Vec::with_capacity(cap);
+
+    let mut child = &self.root;
+    while let Some(node) = child {
+      node_stack.push(node.as_ref());
+      child = &node.left;
+    }
+
+    Iter { node_stack }
   }
 }
 
@@ -200,6 +226,27 @@ fn take_min<T: Ord>(tree: &mut Option<Box<AVLNode<T>>>) -> Option<Box<AVLNode<T>
   }
 }
 
+pub struct Iter<'a, T: Ord> {
+  node_stack: Vec<&'a AVLNode<T>>,
+}
+
+impl<'a, T: Ord> Iterator for Iter<'a, T> {
+  type Item = &'a T;
+  fn next(&mut self) -> Option<Self::Item> {
+    if let Some(node) = self.node_stack.pop() {
+      // Push left path of right subtree to stack
+      let mut child = &node.right;
+      while let Some(subtree) = child {
+        self.node_stack.push(subtree.as_ref());
+        child = &subtree.left;
+      }
+      Some(&node.val)
+    } else {
+      None
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::AVLTree;
@@ -208,27 +255,31 @@ mod tests {
   fn test_avl_tree() {
     // test insert
     let mut avl_tree = AVLTree::new();
-    avl_tree.insert(32);
-    avl_tree.insert(14);
-    avl_tree.insert(51);
-    avl_tree.insert(12);
-    avl_tree.insert(22);
-    avl_tree.insert(17);
-    avl_tree.insert(23);
-    avl_tree.insert(31);
-    avl_tree.insert(30);
-    if let Some(root) = &avl_tree.root {
-      if let Some(right) = &root.right {
-        if let Some(left) = &right.left {
-          assert_eq!(left.val, 30);
-        }
-      }
-    };
-
-    println!("{:?}", &avl_tree.root);
+    let test_data = vec![32, 14, 51, 12, 22];
+    for val in test_data {
+      avl_tree.insert(val);
+    }
+    let root = avl_tree.root.as_ref().unwrap();
+    assert_eq!(root.val, 32);
+    let test_other = vec![23, 31, 30];
+    for val in test_other {
+      avl_tree.insert(val);
+    }
+    let root = avl_tree.root.as_ref().unwrap();
+    assert_eq!(root.val, 22);
+    let right = root.right.as_ref().unwrap();
+    assert_eq!(right.val, 32);
 
     // test remove
-    avl_tree.remove(32);
+    avl_tree.remove(12);
     println!("{:?}", &avl_tree.root);
+
+    // test iter
+    let mut iter = avl_tree.iter();
+    let mut data = vec![];
+    while let Some(val) = iter.next() {
+      data.push(*val);
+    }
+    println!("{:?}", data);
   }
 }
