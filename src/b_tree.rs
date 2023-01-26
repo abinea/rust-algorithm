@@ -161,6 +161,7 @@ mod tests {
     assert!(b_tree.search(30));
     assert_eq!(b_tree.search(16), false);
     // 可视化：https://www.cs.usfca.edu/~galles/visualization/BTree.html，选择偶数degree并勾选 Preemtive Split / Merge (Even max degree only)
-    println!("{:#?}", b_tree);
+    println!("B-Tree: {:?}", b_tree.root.children);
+    b_tree.traverse();
   }
 }
